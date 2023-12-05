@@ -137,7 +137,7 @@ class saastopuu_toolsAlgorithm_qgis(QgsProcessingAlgorithm):
         # to uniquely identify the feature sink, and must be included in the
         # dictionary returned by the processAlgorithm function.
         source = self.parameterAsSource(parameters, self.INPUT, context)
-        if source.featureCount() > 20:
+        if source.featureCount() > 50:
             feedback.reportError("Input layer has too many features. 20 features is maximum. Process failed.")
             sys.exit()
 
