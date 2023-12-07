@@ -289,3 +289,20 @@ def runEssModel2points(in_feat:QgsVectorLayer,trees_field,d_field,weights):
     calculateNPretention(in_feat)
     #weights ={"NP":float(1),"BIO":float(1),"LP":float(1),"DTW":float(1)}
     #calculateEnvValue(in_feat,weights)
+
+def runEssModel2points2(in_feat:QgsVectorLayer,weights,cuttingsize,attributes):
+    attnames = ['species','diameter','treecount','stemcounts','vegetationzones','fertilityclass']
+    normalizeValue(in_feat,"DTW_1",(0.0,1.0),True)
+    #treespeciesFromGrid2(in_feat,"CHM")
+    calculateBiodiversity(in_feat,attributes['stemcounts'])
+    decay2tree(in_feat,attributes['diameter'],attributes['fertilityclass'],attributes['species'],attributes['vegetationzones'])
+    calculateNPretention(in_feat)
+    normalizeValue(in_feat,"biod",None,False)
+    normalizeValue(in_feat,"dtree",None,False)
+    normalizeValue(in_feat,"pRetent",None,False)
+    calculateEnvValue(in_feat,weights)
+    retrees = hsAnalysis(in_feat,'env_value')
+    normalizeValue(retrees,"HS_1",None,False)
+    selectReTrees(retrees,'HS_1n','leimikko',attributes['treecount'],cuttingsize)
+
+    return retrees

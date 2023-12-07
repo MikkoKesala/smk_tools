@@ -44,12 +44,12 @@ from qgis.core import (QgsProcessing,QgsProcessingParameterField,
                        QgsProcessingParameterNumber,
                        QgsProcessingParameterDefinition,
                        QgsProcessingUtils,QgsRasterLayer,QgsVectorLayer)
-import os,time,sys
+import os,time,sys,tempfile
 sys.path.append(os.path.dirname(__file__))
 #from PIL import Image
 from getInput import getWebRasterLayer,getWebVectorLayer,getProtectedSites
 from smk_geotools import feature2Layer,createTreeMap,addFieldValue,joinIntersection
-from smk_essmodels import runEssModel2points
+from smk_essmodels import runEssModel2points2
 
 #from saastopuu import *
 #sys.path.append(os.path.dirname(__file__))
@@ -94,157 +94,128 @@ class essmodels2points(QgsProcessingAlgorithm):
         Here we define the inputs and output of the algorithm, along
         with some other properties.
         """
+        
+        #vector and its fields
         self.addParameter(QgsProcessingParameterFeatureSource('points', 'points', types=[QgsProcessing.TypeVectorPoint], defaultValue=None))
+        self.addParameter(QgsProcessingParameterField('group', 'group by field: e.g. stand_id', type=QgsProcessingParameterField.Any, parentLayerParameterName='points', allowMultiple=False, defaultValue='stand_id'))
+        self.addParameter(QgsProcessingParameterField('fertilityclass', 'fertility class', type=QgsProcessingParameterField.Numeric, parentLayerParameterName='points', allowMultiple=False, defaultValue='fertilityclass'))
         self.addParameter(QgsProcessingParameterField('diameter', 'diameter', type=QgsProcessingParameterField.Numeric, parentLayerParameterName='points', allowMultiple=False, defaultValue='diameter'))
         self.addParameter(QgsProcessingParameterField('species', 'species', type=QgsProcessingParameterField.Numeric, parentLayerParameterName='points', allowMultiple=False, defaultValue='species'))
-        # We add the input vector features source. It can have any kind of
-        # geometry.
-        #self.addParameter(QgsProcessingParameterFeatureSource('cutting', 'cutting', types=[QgsProcessing.TypeVectorPolygon], defaultValue=None))
-       
+        self.addParameter(QgsProcessingParameterField('stemcounts', 'stemcounts ', type=QgsProcessingParameterField.Numeric, parentLayerParameterName='points', allowMultiple=True, defaultValue=["STEMCOUNTPINE","STEMCOUNTDECIDUOUS","STEMCOUNTSPRUCE"]))
+        self.addParameter(QgsProcessingParameterField('vegetationzones', 'vegetation zones', type=QgsProcessingParameterField.Numeric, parentLayerParameterName='points', allowMultiple=False, defaultValue='PaajakoNro'))
         
+        #count of retention trees
+        self.addParameter(QgsProcessingParameterNumber('treecount','Count of retention trees (pcs / ha)',type=QgsProcessingParameterNumber.Integer,minValue=5,maxValue=30,defaultValue=10))
 
-        #self.addParameter(QgsProcessingParameterBoolean('hotspot', 'calculate hotspot', defaultValue=True))
-        #self.addParameter(QgsProcessingParameterRasterDestination('LeikattuLatvus', 'leikattu latvus', createByDefault=True, defaultValue=None))
-        #self.addParameter(QgsProcessingParameterFeatureSink('LeikattuHila', 'Leikattu hila', type=QgsProcessing.TypeVectorAnyGeometry, createByDefault=True, defaultValue=None))
+        #weighing ecosystemvalues
         params = []
-
-        params.append(
-            QgsProcessingParameterEnum(
-                self.FOSFORI,
-                self.tr('Ravinteiden pidättyminen'),
-                options=['Ei painotusta','Pieni','Keskimääräinen','Suuri'],
-                defaultValue=1
-            )
-            )
-
-        params.append(
-            QgsProcessingParameterEnum(
-                self.DTW,
-                self.tr('Maaperän kosteus'),
-                options=['Ei painotusta','Pieni','Keskimääräinen','Suuri'],
-                defaultValue=1
-            )
-            )
-
-        params.append(
-            QgsProcessingParameterEnum(
-                self.BIOD,
-                self.tr('Puuston monimuotoisuus'),
-                options=['Ei painotusta','Pieni','Keskimääräinen','Suuri'],
-                defaultValue=1
-            )
-            )
-
-        params.append(
-            QgsProcessingParameterEnum(
-                self.LAHOP,
-                self.tr('Lahopuupotentiaali'),
-                options=['Ei painotusta','Pieni','Keskimääräinen','Suuri'],
-                defaultValue=1
-            )
-            )
         
-
+        params.append(QgsProcessingParameterEnum(self.FOSFORI,self.tr('Ravinteiden pidättyminen'),options=['Ei painotusta','Pieni','Keskimääräinen','Suuri'],defaultValue=1))
+        params.append(QgsProcessingParameterEnum(self.DTW,self.tr('Maaperän kosteus'),options=['Ei painotusta','Pieni','Keskimääräinen','Suuri'],defaultValue=1))
+        params.append(QgsProcessingParameterEnum(self.BIOD,self.tr('Puuston monimuotoisuus'),options=['Ei painotusta','Pieni','Keskimääräinen','Suuri'],defaultValue=1))
+        params.append(QgsProcessingParameterEnum(self.LAHOP,self.tr('Lahopuupotentiaali'),options=['Ei painotusta','Pieni','Keskimääräinen','Suuri'],defaultValue=1))
+        
+        #setting flag
         for p in params:
             p.setFlags(p.flags() | QgsProcessingParameterDefinition.FlagAdvanced) 
             self.addParameter(p)
 
-
         # We add a feature sink in which to store our processed features (this
         # usually takes the form of a newly created vector layer when the
         # algorithm is run in QGIS).
-        self.addParameter(
-            QgsProcessingParameterFeatureSink(
-                self.OUTPUT,
-                self.tr('points')
-            )
-        )
+        self.addParameter(QgsProcessingParameterFeatureSink(self.OUTPUT,self.tr('points')))
+
     def processAlgorithm(self, parameters, context, feedback):
-            """
-            Here is where the processing itself takes place.
-            """
-            feedb = {1:feedback.setProgressText,
-                    2:feedback.pushWarning,
-                    3:feedback.reportError}
-            # Retrieve the feature source and sink. The 'dest_id' variable is used
-            # to uniquely identify the feature sink, and must be included in the
-            # dictionary returned by the processAlgorithm function.
-            alg_params = {'DISSOLVE':True,'DISTANCE': 50,'END_CAP_STYLE': 0,'INPUT': parameters['points'],'JOIN_STYLE': 0,'MITER_LIMIT': 1,'SEGMENTS': 5,'OUTPUT':'TEMPORARY_OUTPUT'}
-            source = processing.run('native:buffer', alg_params, context=context, feedback=feedback, is_child_algorithm=False)['OUTPUT']
-            source = processing.run("native:multiparttosingleparts", {'INPUT':source,'OUTPUT':'TEMPORARY_OUTPUT'})
-            source = source['OUTPUT']
-            total = source.featureCount()
-            #if parameters['hotspot']==True:
-            features = source.getFeatures()
-            for current, feature in enumerate(features):
-                if feedback.isCanceled():
-                    break
+        """
+        Here is where the processing itself takes place.
+        """
+        feedb = {1:feedback.setProgressText,
+                2:feedback.pushWarning,
+                3:feedback.reportError}
+    
+        source = processing.run("qgis:minimumboundinggeometry", {'INPUT':parameters['points'],'FIELD':parameters['group'],'TYPE':3,'OUTPUT':'TEMPORARY_OUTPUT'},context=context, feedback=feedback, is_child_algorithm=False)['OUTPUT']
+        source = processing.run('native:buffer',{'DISSOLVE':False,'DISTANCE':2,'END_CAP_STYLE': 0,'INPUT': source,'JOIN_STYLE': 0,'MITER_LIMIT': 1,'SEGMENTS': 5,'OUTPUT':'TEMPORARY_OUTPUT'}, context=context, feedback=feedback, is_child_algorithm=False)['OUTPUT']
+        #source = processing.run("native:multiparttosingleparts", {'INPUT':source,'OUTPUT':'TEMPORARY_OUTPUT'})['OUTPUT']
+        #source = source['OUTPUT']
+        #processing.run("native:splitvectorlayer", {'INPUT':parameters['points'],'FIELD':parameters['group'],'PREFIX_FIELD':True,'FILE_TYPE':0,'OUTPUT':tempdir})
+        total = source.featureCount()
+        feedback.setProgressText("Hakkuukohteiden määrä: "+ str(total))
+        #if parameters['hotspot']==True:
+        features = source.getFeatures()
+        for current, feature in enumerate(features):
+            if feedback.isCanceled():
+                break
+        
+            feedback.setProgressText("Haetaan aineistot rajapinnasta")
+            #feedback.pushInfo("pinta-ala: "+str(feature.geometry().area()))
+            #leimFeat = feature.getFeatures()
+            out = feature2Layer(feature,0)
+            areasize = feature.geometry().area()/10000
+            #out1 = feature2Layer(feature,0)
+            out.setCrs(source.crs())
+            #out = addFieldValue(out,"leimikko",1)
             
-                feedback.setProgressText("Haetaan aineistot rajapinnasta")
-                #feedback.pushInfo("pinta-ala: "+str(feature.geometry().area()))
-                #leimFeat = feature.getFeatures()
-                out = feature2Layer(feature,100)
-                #out1 = feature2Layer(feature,0)
-                out.setCrs(source.crs())
+            dtw = getWebRasterLayer(out,self.dtw_data,self.dtw_name)
+            feedb[dtw[2]](dtw[1])
 
+            biogeo = getWebVectorLayer(out,self.mkasviv_data,self.mkasviv_name,self.mkasviv_fields)
+            feedb[biogeo[2]](biogeo[1])
+
+            euc = getWebRasterLayer(out,self.euc_data,"")
+            feedb[euc[2]](euc[1])
+
+            fgrid = getWebVectorLayer(out,self.grid_data,self.gname,self.grid_fields)
+            feedb[fgrid[2]](fgrid[1])
+
+            points = parameters['points']
+            points = addFieldValue(points,"leimikko",1)
+
+            if dtw[2]==1:
+                outChm = processing.run("native:rastersampling", {'INPUT':points,'RASTERCOPY':dtw[0],'COLUMN_PREFIX':'DTW_','OUTPUT':'TEMPORARY_OUTPUT'})
+                outChm = outChm['OUTPUT']
+            else:
+                outChm.dataProvider().addAttributes([QgsField("DTW_1",QVariant.Double)])
+                outChm.updateFields()
                 
-                dtw = getWebRasterLayer(out,self.dtw_data,self.dtw_name)
-                feedb[dtw[2]](dtw[1])
+            if euc[2]==1:
+                outChm = processing.run("native:rastersampling", {'INPUT':outChm,'RASTERCOPY':euc[0],'COLUMN_PREFIX':'euc_','OUTPUT':'TEMPORARY_OUTPUT'})
+                outChm = outChm['OUTPUT']
+            else:
+                outChm.dataProvider().addAttributes([QgsField("euc_1",QVariant.Double)])
+                outChm.updateFields()
 
-                biogeo = getWebVectorLayer(out,self.mkasviv_data,self.mkasviv_name,self.mkasviv_fields)
-                feedb[biogeo[2]](biogeo[1])
+            points = outChm
 
-                euc = getWebRasterLayer(out,self.euc_data,"")
-                feedb[euc[2]](euc[1])
-
-                fgrid = getWebVectorLayer(out,self.grid_data,self.gname,self.grid_fields)
-                feedb[fgrid[2]](fgrid[1])
-
-                points = parameters['points']
-                points = joinIntersection(points,fgrid[0],list(self.grid_fields.split(",")),True)
-                points = joinIntersection(points,biogeo[0],[],True)
-
-                if dtw[2]==1:
-                    outChm = processing.run("native:rastersampling", {'INPUT':points,'RASTERCOPY':dtw[0],'COLUMN_PREFIX':'DTW_','OUTPUT':'TEMPORARY_OUTPUT'})
-                    outChm = outChm['OUTPUT']
-                else:
-                    outChm.dataProvider().addAttributes([QgsField("DTW_1",QVariant.Double)])
-                    outChm.updateFields()
-                    
-                if euc[2]==1:
-                    outChm = processing.run("native:rastersampling", {'INPUT':outChm,'RASTERCOPY':euc[0],'COLUMN_PREFIX':'euc_','OUTPUT':'TEMPORARY_OUTPUT'})
-                    outChm = outChm['OUTPUT']
-                else:
-                    outChm.dataProvider().addAttributes([QgsField("euc_1",QVariant.Double)])
-                    outChm.updateFields()
-
-                points = outChm
-
-                feedback.setProgressText("Lasketaan ympäristötekijöiden arvot")
-                #feedback.setProgress(60)
+            feedback.setProgressText("Lasketaan ympäristötekijöiden arvot")
+            #feedback.setProgress(60)
+            #treecount = points.featureCount()
             
 
-                fosf = self.parameterAsInt(parameters,self.FOSFORI,context)
-                dtw = self.parameterAsInt(parameters,self.DTW,context)
-                biod = self.parameterAsInt(parameters,self.BIOD,context)
-                lahop = self.parameterAsInt(parameters,self.LAHOP,context)
+            fosf = self.parameterAsInt(parameters,self.FOSFORI,context)
+            dtw = self.parameterAsInt(parameters,self.DTW,context)
+            biod = self.parameterAsInt(parameters,self.BIOD,context)
+            lahop = self.parameterAsInt(parameters,self.LAHOP,context)
 
-                weights ={"NP":float(fosf),"BIO":float(biod),"LP":float(lahop),"DTW":float(dtw)}
-                runEssModel2points(points,str(parameters['species']),str(parameters['diameter']),weights)
-                #feedback.pushInfo(str(parameters['diameter']))
-                if current == 0:
-                    (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT,context,
-                    points.fields(), points.wkbType(), points.crs())
-                #feedback.pushInfo(str(out.fields().names()))
-                outFeats = points.getFeatures()
-                for outFeat in outFeats:
-                    #feedback.pushInfo(str(outFeat['CHM']))
-                    sink.addFeature(outFeat, QgsFeatureSink.FastInsert)
-            
-                layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
-                feedback.setProgress(int(current / total*100))
+            weights ={"NP":float(fosf),"BIO":float(biod),"LP":float(lahop),"DTW":float(dtw)}
+            #if parameters['retreet'] == True:
+            #    runEssModel(points)
+            attnames = ['species','diameter','treecount','stemcounts','vegetationzones','fertilityclass']
+            attributes = {i:parameters[i] for i in attnames}
+            runEssModel2points2(points,weights,str(parameters['treecount']),areasize,attributes)
+            #feedback.pushInfo(str(parameters['diameter']))
+            if current == 0:
+                (sink, dest_id) = self.parameterAsSink(parameters, self.OUTPUT,context,
+                points.fields(), points.wkbType(), points.crs())
+            #feedback.pushInfo(str(out.fields().names()))
+            outFeats = points.getFeatures()
+            for outFeat in outFeats:
+                #feedback.pushInfo(str(outFeat['CHM']))
+                sink.addFeature(outFeat, QgsFeatureSink.FastInsert)
+        
+            layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
+            feedback.setProgress(int((current+1) / total*100))
 
-            return {self.OUTPUT: dest_id}
+        return {self.OUTPUT: dest_id}
 
     def name(self):
         """
