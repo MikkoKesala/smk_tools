@@ -44,13 +44,13 @@ class Valumamalli(QgsProcessingAlgorithm):
         self.addParameter(QgsProcessingParameterNumber('tartunta', 'Tartuntaetäisyys', type=QgsProcessingParameterNumber.Integer, minValue=0, maxValue=20, defaultValue=5))
         self.addParameter(QgsProcessingParameterPoint('purkupiste', 'purkupiste', defaultValue='0.000000,0.000000'))
         self.addParameter(QgsProcessingParameterFeatureSink('Valuma-alue', 'Valuma-alue'))
-        params = []
-        params.append(QgsProcessingParameterRasterLayer("d8","suuntarasteri",defaultValue="suuntarasteri"))
-        params.append(QgsProcessingParameterRasterLayer("fa","virtausverkko",defaultValue="virtausverkko"))
+        #params = []
+        #params.append(QgsProcessingParameterRasterLayer("d8","suuntarasteri",defaultValue="suuntarasteri"))
+        #params.append(QgsProcessingParameterRasterLayer("fa","virtausverkko",defaultValue="virtausverkko"))
         #[p.setFlags(p.flags | QgsProcessingParameterDefinition.FlagAdvanced) for p in params]
-        for p in params:
-            p.setFlags(p.flags() | QgsProcessingParameterDefinition.FlagAdvanced) 
-            self.addParameter(p)
+        #for p in params:
+         #   p.setFlags(p.flags() | QgsProcessingParameterDefinition.FlagAdvanced) 
+          #  self.addParameter(p)
         #self.addParameter(QgsProcessingParameterRasterDestination('Outrast', 'outrast', createByDefault=True, defaultValue=None))
 
     def processAlgorithm(self, parameters, context, model_feedback):
@@ -111,9 +111,11 @@ class Valumamalli(QgsProcessingAlgorithm):
             
             feedback.setProgressText("rajataan tausta-aineistot valuma-alueelle")
             #layer = QgsProcessingUtils.mapLayerFromString(jako5_raj, context)
-            D8 = QgsProcessingUtils.mapLayerFromString(parameters['d8'],context)
+            #D8 = QgsProcessingUtils.mapLayerFromString(parameters['d8'],context)
+            D8 = QgsRasterLayer(self.D8url,"suuntarasteri","wcs")
             D8= clipRaster3(D8,jako5_raj)
-            FA = QgsProcessingUtils.mapLayerFromString(parameters['fa'],context)
+            #FA = QgsProcessingUtils.mapLayerFromString(parameters['fa'],context)
+            FA = QgsRasterLayer(self.FAurl,"suuntarasteri","wcs")
             FA= clipRaster3(FA,jako5_raj)
             
             

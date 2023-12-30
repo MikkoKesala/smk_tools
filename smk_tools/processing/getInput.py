@@ -104,9 +104,13 @@ def doESRIfeatParams(input_polygon:QgsVectorLayer,name:str,attributes:str):
                 "f":"geojson"}
     return params
 
-def getWebVectorLayer(input_polygon:QgsVectorLayer,url:str,name:str,attributes:str):
+def getWebVectorLayer(input_polygon:QgsVectorLayer,url:str,name:str,attributes:str,mandatory:bool):
     tempd = tempfile.TemporaryFile()
     tempd = tempd.name+'.geojson'
+
+    mand = {True:3,
+            False:2}
+    
     if url.endswith("wfs?") or url.endswith("ows?"):
         params = doWfsParams(input_polygon,name,attributes)
     else:
@@ -114,13 +118,14 @@ def getWebVectorLayer(input_polygon:QgsVectorLayer,url:str,name:str,attributes:s
         params = doESRIfeatParams(input_polygon,name,attributes)
     
     respo_layer =""
+
     try:
         respo = requests.get(url,params,allow_redirects=True)
         print (respo.status_code)
         if respo.status_code != 200:
-            info = "Not getting connection to forest data: "+str(url)
+            info = "Ei saada tällä hetkellä yhteyttä rajapintaan: "+str(url)
             print (respo.raise_for_status())
-            infolevel = 3
+            infolevel = mand[mandatory]
         else:
             respo_js = respo.json()
             with open(tempd, "w") as outfile:
@@ -128,27 +133,30 @@ def getWebVectorLayer(input_polygon:QgsVectorLayer,url:str,name:str,attributes:s
             
             respo_layer = QgsVectorLayer(tempd,name,"ogr")
             if respo_layer.featureCount() == 0:
-                info = "Not able to find data from area"
-                infolevel = 3
+                info = "Alueella ei ole kohteita rajapinnassa: "+str(url)
+                infolevel = mand[mandatory]
             else:
                 respo_layer = processing.run("native:fixgeometries",{'INPUT':respo_layer,'OUTPUT':'TEMPORARY_OUTPUT'})
                 respo_layer = respo_layer['OUTPUT']
-                info = "Forest data is ok"
+                info = "Aineisto luettu rajapinnasta: "+str(url)
                 infolevel = 1
     
     except Exception as e:
         print (e)
-        info = "Not getting connection to forest data: "+str(url)
-        infolevel = 3
+        info = "Ei saada tällä hetkellä yhteyttä rajapintaan: "+str(url)
+        infolevel = mand[mandatory]
     
     
     
     
     return respo_layer,info,infolevel
 
-def getWebRasterLayer(input_polygon:QgsVectorLayer,url:str,name:str):
+def getWebRasterLayer(input_polygon:QgsVectorLayer,url:str,name:str,mandatory:bool):
     tempd = tempfile.TemporaryFile()
     tempd = tempd.name+'.tif'
+
+    mand = {True:3,
+            False:2}
     
     if url.endswith("ImageServer"):
         url = url + "/exportImage?"
@@ -165,14 +173,14 @@ def getWebRasterLayer(input_polygon:QgsVectorLayer,url:str,name:str):
         respo= requests.get(url,params,allow_redirects=True)
         
         if respo.status_code != 200:
-           info = "Cannot connect to data: "+str(url)
-           infolevel = 3
+           info = "Ei saada yhteyttä rajapintaan: "+str(url)
+           infolevel = mand[mandatory]
         else:
             open(tempd,'wb').write(respo.content)
     
     except Exception as e:
         info = str(e)
-        infolevel = 3
+        infolevel = mand[mandatory]
     
         
     try:
@@ -180,15 +188,15 @@ def getWebRasterLayer(input_polygon:QgsVectorLayer,url:str,name:str):
         test_b = test.GetRasterBand(1)
         test_a = test_b.ReadAsArray()
         if np.max(test_a) > 1.0:
-            info =  "data is ok!"
+            info =  "Aineisto luettu rajapinnasta: "+str(url)
             infolevel = 1
             del test,test_b,test_a
         else:
-           info = "Not able find data from area"
-           infolevel = 3
+           info = "Alueelta ei ole tietoa: "+str(url)
+           infolevel = mand[mandatory]
     except Exception as e:
-        info = str(e)
-        infolevel = 3
+        info = "Alueelta ei ole tieto aineistosta: "+ str(url) +"\n"+str(e)
+        infolevel = mand[mandatory]
 
     return tempd,info,infolevel
 

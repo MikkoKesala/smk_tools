@@ -149,7 +149,7 @@ class suojakaista_toolsAlgorithm(QgsProcessingAlgorithm):
         source = self.parameterAsSource(parameters, self.INPUT, context)
         if source.featureCount() > 20:
             feedback.reportError("Input layer has too many features. 20 features is maximum. Process failed.")
-            sys.exit()
+            sys.exit(0)
 
         feedback.pushInfo("Aloitetaan suojakaistan luonti")
         source = processing.run("native:dissolve", {'INPUT':parameters['INPUT'],'FIELD':[],'SEPARATE_DISJOINT':True,'OUTPUT':'TEMPORARY_OUTPUT'})

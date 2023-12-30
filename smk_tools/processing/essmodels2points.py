@@ -155,16 +155,16 @@ class essmodels2points(QgsProcessingAlgorithm):
             out.setCrs(source.crs())
             #out = addFieldValue(out,"leimikko",1)
             
-            dtw = getWebRasterLayer(out,self.dtw_data,self.dtw_name)
+            dtw = getWebRasterLayer(out,self.dtw_data,self.dtw_name,False)
             feedb[dtw[2]](dtw[1])
 
-            biogeo = getWebVectorLayer(out,self.mkasviv_data,self.mkasviv_name,self.mkasviv_fields)
+            biogeo = getWebVectorLayer(out,self.mkasviv_data,self.mkasviv_name,self.mkasviv_fields,False)
             feedb[biogeo[2]](biogeo[1])
 
-            euc = getWebRasterLayer(out,self.euc_data,"")
+            euc = getWebRasterLayer(out,self.euc_data,"",False)
             feedb[euc[2]](euc[1])
 
-            fgrid = getWebVectorLayer(out,self.grid_data,self.gname,self.grid_fields)
+            fgrid = getWebVectorLayer(out,self.grid_data,self.gname,self.grid_fields,False)
             feedb[fgrid[2]](fgrid[1])
 
             points = parameters['points']

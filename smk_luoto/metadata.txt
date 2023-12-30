@@ -6,14 +6,14 @@
 name=SMK_Luoto
 qgisMinimumVersion=3.2
 description=Metsäkeskuksen Luoto-sovelluksen työkalut
-version=0.1.3
+version=0.1.4
 author=Suomen metsäkeskus
 email=luontotieto@metsakeskus.fi
 
 about=Lisäosassa on Luoto-sovelluksen tarpeisiin tehdyt geoprosessointityökalut
 
-tracker=https://github.com/SuomenMetsakeskus/smk_luoto/issues
-repository=https://github.com/SuomenMetsakeskus/smk_luoto
+tracker=https://github.com/SuomenMetsakeskus/smk_tools/issues
+repository=https://github.com/SuomenMetsakeskus/smk_tools
 # End of mandatory metadata
 
 # Recommended items:

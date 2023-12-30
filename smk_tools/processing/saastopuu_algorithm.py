@@ -204,12 +204,10 @@ class saastopuu_toolsAlgorithm(QgsProcessingAlgorithm):
         for current, feature in enumerate(features):
             #feedback.setProgressText("testia ja "+str(out))
             # Stop the algorithm if cancel button has been clicked
+            situ = int((current+1) / total*100)
             if feedback.isCanceled():
                 break
-            
-            #out.select(feature.id())
-            #uri = "polygon?crs="+str(source.sourceCrs())+"&field=id:integer&"
-            #QgsVectorLayer(uri,"mem","memory")
+
             feedback.setProgressText("Haetaan aineistot rajapinnasta")
 
             #leimFeat = feature.getFeatures()
@@ -219,22 +217,29 @@ class saastopuu_toolsAlgorithm(QgsProcessingAlgorithm):
             out.setCrs(source.crs())
             out1.setCrs(source.crs())
 
-            chm = getWebRasterLayer(out,self.chm_data,"")
+            chm = getWebRasterLayer(out,self.chm_data,"",True)
             feedb[chm[2]](chm[1])
+            if chm[2]==3:
+                break
             
-            stand = getWebVectorLayer(out,self.stand_data,self.stand_name,self.stand_fields)
+            stand = getWebVectorLayer(out,self.stand_data,self.stand_name,self.stand_fields,False)
             feedb[stand[2]](stand[1])
+   
 
-            fgrid = getWebVectorLayer(out,self.grid_data,self.gname,self.grid_fields)
+            fgrid = getWebVectorLayer(out,self.grid_data,self.gname,self.grid_fields,True)
             feedb[fgrid[2]](fgrid[1])
+            if fgrid[2]==3:
+                break
 
-            dtw = getWebRasterLayer(out,self.dtw_data,self.dtw_name)
+            dtw = getWebRasterLayer(out,self.dtw_data,self.dtw_name,False)
             feedb[dtw[2]](dtw[1])
 
-            biogeo = getWebVectorLayer(out,self.mkasviv_data,self.mkasviv_name,self.mkasviv_fields)
+            biogeo = getWebVectorLayer(out,self.mkasviv_data,self.mkasviv_name,self.mkasviv_fields,True)
             feedb[biogeo[2]](biogeo[1])
+            if biogeo[2]==3:
+                break
 
-            euc = getWebRasterLayer(out,self.euc_data,"")
+            euc = getWebRasterLayer(out,self.euc_data,"",False)
             feedb[euc[2]](euc[1])
             
             proSites = getProtectedSites(out)
@@ -242,23 +247,20 @@ class saastopuu_toolsAlgorithm(QgsProcessingAlgorithm):
             #joinList = [stand,fgrid,biogeo,proSites]
             #print (proSites)
             #if proSites is not None
-            feedback.setProgress(10)
+            feedback.setProgress(situ*0.10)
 
             
-            feedback.setProgressText("Aloitetaan puukartan luonti")
-            feedback.setProgress(10)
+            feedback.setProgressText("Luodaan puukartta latvusmallista")
+            feedback.setProgress(situ*0.20)
             #print (chm)
             #chm =processRaster(chm[0])
-            feedback.setProgress(20)
-            feedback.setProgressText("vektoroidaan puukartta")
-            feedback.setProgress(30)
             
             outChm = createTreeMap(chm[0],3,True)
 
-            feedback.setProgress(40)
+            feedback.setProgress(situ*0.40)
 
-            feedback.setProgressText("Rikastetaan tiedot")
-            feedback.setProgress(50)
+            feedback.setProgressText("Toteutetaan spatiaalinen liitos aineistoille")
+            feedback.setProgress(situ*0.50)
 
 
             outChm = joinIntersection(outChm,stand[0],list(self.stand_fields.split(",")),False)
@@ -282,7 +284,7 @@ class saastopuu_toolsAlgorithm(QgsProcessingAlgorithm):
                 outChm.updateFields()
 
             feedback.setProgressText("Lasketaan ympäristötekijöiden arvot")
-            feedback.setProgress(60)
+            feedback.setProgress(situ*0.60)
             
 
             fosf = self.parameterAsInt(parameters,self.FOSFORI,context)
@@ -295,7 +297,7 @@ class saastopuu_toolsAlgorithm(QgsProcessingAlgorithm):
             out = runEssModel(outChm,weights,puuMaara,leimArea[0],'PaajakoNro')
             #calculateEnvValue(outChm,weights)
 
-            feedback.setProgressText("koko: "+str(round(leimArea[0],2))+"\ns-puiden määrä: "+str(int(puuMaara*leimArea[0])))
+            #feedback.setProgressText("Hakkuuala: "+str(round(leimArea[0],2))+"\nsäästöpuiden määrä: "+str(int(puuMaara*leimArea[0])))
             
             idx=[out.fields().indexFromName(n) for n in self.delfields]
             #idx.append(out.fields().indexFromName('fid'))
@@ -303,12 +305,6 @@ class saastopuu_toolsAlgorithm(QgsProcessingAlgorithm):
             out.dataProvider().deleteAttributes(idx)
             out.updateFields()
 
-            #self.informText.setText("Säästöpuugraafi: "+t)
-            feedback.setProgressText("viimeistellään")
-
-            for i in range(70,100):
-                time.sleep(0.004)
-                feedback.setProgress(i+1)
 
             style = os.path.join(os.path.dirname(__file__),"reTree3.qml")
         
@@ -324,25 +320,9 @@ class saastopuu_toolsAlgorithm(QgsProcessingAlgorithm):
                 sink.addFeature(outFeat, QgsFeatureSink.FastInsert)
         
             layer = QgsProcessingUtils.mapLayerFromString(dest_id, context)
-            """
-            if str((layer.dataProvider().dataSourceUri())).startswith("memory?") == True:
-                graafi = ""
-            else:
-                filefold = os.path.dirname(layer.dataProvider().dataSourceUri())
-                feedback.pushInfo(str(filefold))
-                graafi = os.path.join(filefold,"Ympäristötekijät.png")
-        
-            #feedback.pushInfo("test: "+str(te))
-            graafi = makeRetentionGraph(out,graafi)
-            g = Image.open(graafi)
-            g.show()"""
-            #sink.setName("Säästöpuut")
-            
-
-        
-
+            feedback.setProgressText("Hakkuukohteen "+ str(current+1)+"/"+str(total)+" elinympäristöarvot tarkasteltu")
             # Update the progress bar
-            feedback.setProgress(int(current * total))
+            feedback.setProgress(int(situ))
 
         # Return the results of the algorithm. In this case our only result is
         # the feature sink which contains the processed features, but some
@@ -350,21 +330,24 @@ class saastopuu_toolsAlgorithm(QgsProcessingAlgorithm):
         # statistics, etc. These should all be included in the returned
         # dictionary, with keys matching the feature corresponding parameter
         # or output names.
-        layer.loadNamedStyle(style)
-        style2 = os.path.join(os.path.dirname(__file__),"retreet_areas.qml")
-        reareas = point2area(layer,'reTree',1)
-        
-        (sink, area_id) = self.parameterAsSink(parameters, self.AREAS,context,
-                    reareas.fields(), reareas.wkbType(), reareas.crs())
-        outFeats = reareas.getFeatures()
-        for outFeat in outFeats:
-                #feedback.pushInfo(str(outFeat['CHM']))
-                sink.addFeature(outFeat, QgsFeatureSink.FastInsert)
-        
-        layer2 = QgsProcessingUtils.mapLayerFromString(area_id, context)
-        layer2.loadNamedStyle(style2)
+        try:
+            layer.loadNamedStyle(style)
+            style2 = os.path.join(os.path.dirname(__file__),"retreet_areas.qml")
+            reareas = point2area(layer,'reTree',1)
+            
+            (sink, area_id) = self.parameterAsSink(parameters, self.AREAS,context,
+                        reareas.fields(), reareas.wkbType(), reareas.crs())
+            outFeats = reareas.getFeatures()
+            for outFeat in outFeats:
+                    #feedback.pushInfo(str(outFeat['CHM']))
+                    sink.addFeature(outFeat, QgsFeatureSink.FastInsert)
+            
+            layer2 = QgsProcessingUtils.mapLayerFromString(area_id, context)
+            layer2.loadNamedStyle(style2)
 
-        return {self.OUTPUT: dest_id,self.AREAS:area_id}
+            return {self.OUTPUT: dest_id,self.AREAS:area_id}
+        except:
+            feedback.reportError("Säästöpuuehdotusta ei pystytty toteuttamaan alueelle")
 
     def name(self):
         """

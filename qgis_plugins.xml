@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <plugins>
- <pyqgis_plugin name="smk luontotyökalut" version="1.1.6">
+ <pyqgis_plugin name="smk luontotyökalut" version="1.1.7">
      <description>Suomen metsäkeskuksen työkalut</description>
      <homepage>https://www.metsakeskus.fi/fi/avoin-metsa-ja-luontotieto/aineistot-paikkatieto-ohjelmille/tyokalut</homepage>
      <qgis_minimum_version>3.26</qgis_minimum_version>
@@ -10,14 +10,3 @@
      <email>luontotieto@metsakeskus.fi</email>
      <download_url>https://github.com/MikkoKesala/smk_tools/raw/main/smk_tools/smk_tools.zip</download_url>
  </pyqgis_plugin>
- <pyqgis_plugin name="smk luoto" version="0.1.3">
-     <description>Suomen metsäkeskuksen Luoto-sovelluksen geoprosessointimallit</description>
-     <homepage>https://www.metsakeskus.fi/fi/avoin-metsa-ja-luontotieto/aineistot-paikkatieto-ohjelmille/tyokalut</homepage>
-     <qgis_minimum_version>3.2</qgis_minimum_version>
-     <tags>forest,metsäkeskus,forest centre,säästöpuutyökalu,suojakaistatyökalu</tags>
-     <file_name>smk_luoto.zip</file_name>
-     <author_name>SuomenMetsakeskus</author_name>
-     <email>luontotieto@metsakeskus.fi</email>
-     <download_url>https://github.com/MikkoKesala/smk_tools/raw/main/smk_luoto.zip</download_url>
- </pyqgis_plugin>
-</plugins>
