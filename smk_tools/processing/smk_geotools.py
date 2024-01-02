@@ -213,8 +213,10 @@ def point2area(input_points,fname,value):
     This converts points to area. You can filter points specific field value.
     """
     copylayer = copyVector(input_points)
+    
     if len(fname) > 0 and value is not None:
         NoLeim = [feat.id() for feat in copylayer.getFeatures() if feat[fname]!=value]
+        
     
         copylayer.dataProvider().deleteFeatures(NoLeim)
         copylayer.updateFields()
